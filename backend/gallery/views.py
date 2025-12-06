@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, parsers, status, filters
+from django.db import models
 from .models import Album, Photo, Share
-from .serializers import AlbumSerializer, PhotoSerializer, ShareSerializer
+from .serializers import AlbumSerializer, PhotoSerializer, ShareSerializer, SharedContentSerializer, ShareDetailSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from PIL import Image, ImageEnhance
@@ -33,6 +34,17 @@ class AlbumViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def shares(self, request, pk=None):
+        """List all shares for this album"""
+        album = self.get_object()
+        if album.owner != request.user:
+            return Response({'error': 'Only the owner can view shares'}, status=403)
+        
+        shares = Share.objects.filter(album=album, redeemed=True)
+        serializer = ShareDetailSerializer(shares, many=True)
+        return Response(serializer.data)
 
 class PhotoViewSet(viewsets.ModelViewSet):
     serializer_class = PhotoSerializer
@@ -140,6 +152,7 @@ class PhotoViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'])
     def mark_seen(self, request, pk=None):
         photo = self.get_object()
         if request.user != photo.owner:
@@ -147,6 +160,17 @@ class PhotoViewSet(viewsets.ModelViewSet):
         
         photo.edit_logs.filter(is_seen=False).update(is_seen=True)
         return Response({'status': 'marked_seen'})
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def shares(self, request, pk=None):
+        """List all shares for this photo"""
+        photo = self.get_object()
+        if photo.owner != request.user:
+            return Response({'error': 'Only the owner can view shares'}, status=403)
+        
+        shares = Share.objects.filter(photo=photo, redeemed=True)
+        serializer = ShareDetailSerializer(shares, many=True)
+        return Response(serializer.data)
 
 class ShareViewSet(viewsets.ModelViewSet):
     serializer_class = ShareSerializer
@@ -178,7 +202,7 @@ class ShareViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated], url_path='received')
     def received(self, request):
         shares = Share.objects.filter(shared_with=request.user, redeemed=True)
-        serializer = self.get_serializer(shares, many=True)
+        serializer = SharedContentSerializer(shares, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated], url_path='view/(?P<token>[^/.]+)')
@@ -204,3 +228,42 @@ class ShareViewSet(viewsets.ModelViewSet):
             return Response(response_data)
         except Share.DoesNotExist:
             return Response({'error': 'Invalid token'}, status=404)
+
+    def update(self, request, *args, **kwargs):
+        """Update share permissions (only owner can update)"""
+        share = self.get_object()
+        
+        # Check if user is the owner of the shared content
+        is_owner = False
+        if share.album and share.album.owner == request.user:
+            is_owner = True
+        elif share.photo and share.photo.owner == request.user:
+            is_owner = True
+        
+        if not is_owner:
+            return Response({'error': 'Only the owner can update share permissions'}, status=403)
+        
+        # Only allow updating can_edit field
+        if 'can_edit' in request.data:
+            share.can_edit = request.data['can_edit']
+            share.save()
+        
+        serializer = ShareDetailSerializer(share)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        """Revoke share access (only owner can revoke)"""
+        share = self.get_object()
+        
+        # Check if user is the owner of the shared content
+        is_owner = False
+        if share.album and share.album.owner == request.user:
+            is_owner = True
+        elif share.photo and share.photo.owner == request.user:
+            is_owner = True
+        
+        if not is_owner:
+            return Response({'error': 'Only the owner can revoke share access'}, status=403)
+        
+        share.delete()
+        return Response({'status': 'access revoked'}, status=status.HTTP_204_NO_CONTENT)

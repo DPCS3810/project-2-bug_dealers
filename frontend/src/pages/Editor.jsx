@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import client from '../api/client';
-import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X, Share2 } from 'lucide-react';
+import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X, Share2, Download } from 'lucide-react';
 import { getCroppedImg, applyFilters } from '../utils/canvasUtils';
 import ShareModal from '../components/ShareModal';
 
@@ -45,6 +45,9 @@ export default function Editor() {
         brightness: 100,
         contrast: 100,
         saturation: 100,
+        sharpness: 0,
+        blur: 0,
+        vignette: 0,
     });
 
     // Crop & Rotate
@@ -90,7 +93,7 @@ export default function Editor() {
             const newHistory = history.slice(0, -1);
             setHistory(newHistory);
             setImageSrc(newHistory[newHistory.length - 1]);
-            setAdjustments({ brightness: 100, contrast: 100, saturation: 100 });
+            setAdjustments({ brightness: 100, contrast: 100, saturation: 100, sharpness: 0, blur: 0, vignette: 0 });
             setCrop(undefined);
             setRotation(0);
         }
@@ -105,7 +108,7 @@ export default function Editor() {
             const blob = await applyFilters(imageSrc, adjustments);
             const newUrl = URL.createObjectURL(blob);
             addToHistory(newUrl);
-            setAdjustments({ brightness: 100, contrast: 100, saturation: 100 });
+            setAdjustments({ brightness: 100, contrast: 100, saturation: 100, sharpness: 0, blur: 0, vignette: 0 });
             setActiveTab('adjust');
         } catch (e) {
             console.error('Filter apply error', e);
@@ -138,9 +141,35 @@ export default function Editor() {
 
     const applyCrop = async () => {
         try {
+            if (!completedCrop || !imgRef.current) {
+                showNotification("Please select a crop area first", true);
+                return;
+            }
+
+            // Get the actual image dimensions
+            const image = imgRef.current;
+            const scaleX = image.naturalWidth / image.width;
+            const scaleY = image.naturalHeight / image.height;
+
+            // Convert percentage crop to pixel crop based on natural image size
+            const pixelCrop = {
+                x: completedCrop.x * scaleX,
+                y: completedCrop.y * scaleY,
+                width: completedCrop.width * scaleX,
+                height: completedCrop.height * scaleY,
+            };
+
+            console.log('Crop info:', {
+                completedCrop,
+                pixelCrop,
+                imageDisplaySize: { width: image.width, height: image.height },
+                imageNaturalSize: { width: image.naturalWidth, height: image.naturalHeight },
+                scale: { scaleX, scaleY }
+            });
+
             const blob = await getCroppedImg(
                 imageSrc,
-                completedCrop,
+                pixelCrop,
                 rotation
             );
             const newUrl = URL.createObjectURL(blob);
@@ -220,8 +249,25 @@ export default function Editor() {
     const handleDelete = () => {
         if (!window.confirm('Are you sure you want to delete this photo?')) return;
         client.delete(`/gallery/photos/${id}/`)
-            .then(() => navigate(-1))
             .catch(err => showNotification('Failed to delete photo', true));
+    };
+
+    const downloadPhoto = async () => {
+        try {
+            const response = await fetch(imageSrc);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = title || `photo-${id}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download photo:', err);
+            showNotification('Failed to download photo', true);
+        }
     };
 
     if (!photo) return <div className="text-center mt-10">Loading...</div>;
@@ -260,6 +306,13 @@ export default function Editor() {
                         title="Share"
                     >
                         <Share2 className="h-5 w-5" />
+                    </button>
+                    <button
+                        onClick={downloadPhoto}
+                        className="p-2 text-teal-600 hover:bg-teal-50 rounded"
+                        title="Download"
+                    >
+                        <Download className="h-5 w-5" />
                     </button>
                     <button onClick={() => handleSave(true)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Save Copy</button>
                     <button onClick={() => handleSave(false)} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center">
@@ -305,7 +358,7 @@ export default function Editor() {
                             alt="Editing"
                             className="max-w-full max-h-full object-contain shadow-lg"
                             style={{
-                                filter: `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`
+                                filter: `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%) blur(${adjustments.blur}px)`
                             }}
                         />
                     </div>
@@ -335,35 +388,64 @@ export default function Editor() {
                 {/* Contextual Controls */}
                 <div className="h-24">
                     {activeTab === 'adjust' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-                            <div className="space-y-1">
-                                <label className="text-xs text-gray-500 flex justify-between">Brightness <span>{adjustments.brightness}%</span></label>
-                                <input
-                                    type="range" min="0" max="200"
-                                    value={adjustments.brightness}
-                                    onChange={(e) => handleAdjustmentChange('brightness', e.target.value)}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                />
+                        <div className="space-y-3 max-w-6xl mx-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 flex justify-between">Brightness <span>{adjustments.brightness}%</span></label>
+                                    <input
+                                        type="range" min="0" max="200"
+                                        value={adjustments.brightness}
+                                        onChange={(e) => handleAdjustmentChange('brightness', e.target.value)}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 flex justify-between">Contrast <span>{adjustments.contrast}%</span></label>
+                                    <input
+                                        type="range" min="0" max="200"
+                                        value={adjustments.contrast}
+                                        onChange={(e) => handleAdjustmentChange('contrast', e.target.value)}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 flex justify-between">Saturation <span>{adjustments.saturation}%</span></label>
+                                    <input
+                                        type="range" min="0" max="200"
+                                        value={adjustments.saturation}
+                                        onChange={(e) => handleAdjustmentChange('saturation', e.target.value)}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 flex justify-between">Sharpness <span>{adjustments.sharpness}</span></label>
+                                    <input
+                                        type="range" min="0" max="100"
+                                        value={adjustments.sharpness}
+                                        onChange={(e) => handleAdjustmentChange('sharpness', e.target.value)}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 flex justify-between">Blur <span>{adjustments.blur}px</span></label>
+                                    <input
+                                        type="range" min="0" max="20"
+                                        value={adjustments.blur}
+                                        onChange={(e) => handleAdjustmentChange('blur', e.target.value)}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 flex justify-between">Vignette <span>{adjustments.vignette}</span></label>
+                                    <input
+                                        type="range" min="0" max="100"
+                                        value={adjustments.vignette}
+                                        onChange={(e) => handleAdjustmentChange('vignette', e.target.value)}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs text-gray-500 flex justify-between">Contrast <span>{adjustments.contrast}%</span></label>
-                                <input
-                                    type="range" min="0" max="200"
-                                    value={adjustments.contrast}
-                                    onChange={(e) => handleAdjustmentChange('contrast', e.target.value)}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs text-gray-500 flex justify-between">Saturation <span>{adjustments.saturation}%</span></label>
-                                <input
-                                    type="range" min="0" max="200"
-                                    value={adjustments.saturation}
-                                    onChange={(e) => handleAdjustmentChange('saturation', e.target.value)}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                />
-                            </div>
-                            <div className="col-span-full flex justify-center mt-2">
+                            <div className="flex justify-center mt-2">
                                 <button onClick={applyAdjustments} className="px-4 py-1 bg-indigo-100 text-indigo-700 rounded text-sm hover:bg-indigo-200">
                                     Apply Adjustments
                                 </button>

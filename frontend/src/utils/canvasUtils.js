@@ -102,13 +102,74 @@ export async function applyFilters(imageSrc, adjustments) {
     canvas.width = image.width;
     canvas.height = image.height;
 
-    // Apply filters
-    const { brightness = 100, contrast = 100, saturation = 100 } = adjustments;
-    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+    // Apply CSS filters
+    const { brightness = 100, contrast = 100, saturation = 100, blur = 0 } = adjustments;
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px)`;
 
     ctx.drawImage(image, 0, 0);
+
+    // Apply sharpness if needed
+    if (adjustments.sharpness && adjustments.sharpness > 0) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const sharpened = applySharpen(imageData, adjustments.sharpness / 100);
+        ctx.putImageData(sharpened, 0, 0);
+    }
+
+    // Apply vignette if needed
+    if (adjustments.vignette && adjustments.vignette > 0) {
+        applyVignette(ctx, canvas.width, canvas.height, adjustments.vignette / 100);
+    }
 
     return new Promise((resolve) => {
         canvas.toBlob(resolve, 'image/jpeg');
     });
+}
+
+function applySharpen(imageData, amount) {
+    const data = imageData.data;
+    const w = imageData.width;
+    const h = imageData.height;
+    const output = new ImageData(w, h);
+
+    // Sharpening kernel
+    const kernel = [
+        0, -amount, 0,
+        -amount, 1 + 4 * amount, -amount,
+        0, -amount, 0
+    ];
+
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            for (let c = 0; c < 3; c++) {
+                let sum = 0;
+                for (let ky = -1; ky <= 1; ky++) {
+                    for (let kx = -1; kx <= 1; kx++) {
+                        const idx = ((y + ky) * w + (x + kx)) * 4 + c;
+                        const kidx = (ky + 1) * 3 + (kx + 1);
+                        sum += data[idx] * kernel[kidx];
+                    }
+                }
+                const idx = (y * w + x) * 4 + c;
+                output.data[idx] = Math.max(0, Math.min(255, sum));
+            }
+            const idx = (y * w + x) * 4;
+            output.data[idx + 3] = 255; // Alpha
+        }
+    }
+
+    return output;
+}
+
+function applyVignette(ctx, width, height, amount) {
+    const gradient = ctx.createRadialGradient(
+        width / 2, height / 2, 0,
+        width / 2, height / 2, Math.max(width, height) / 2
+    );
+
+    gradient.addColorStop(0, `rgba(0, 0, 0, 0)`);
+    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${amount * 0.3})`);
+    gradient.addColorStop(1, `rgba(0, 0, 0, ${amount * 0.8})`);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
 }

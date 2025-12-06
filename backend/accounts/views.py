@@ -105,12 +105,22 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
     def patch(self, request, *args, **kwargs):
-        # Handle profile picture deletion
-        if 'profile_picture' in request.data and request.data['profile_picture'] in [None, '', 'null']:
-            user = self.get_object()
-            if user.profile_picture:
-                user.profile_picture.delete(save=False)
-            user.profile_picture = None
-            user.save()
-            return Response(UserSerializer(user).data)
+        # Handle profile picture deletion (sent as JSON)
+        if 'profile_picture' in request.data:
+            pic_value = request.data.get('profile_picture')
+            # Check if it's a deletion request (null, None, empty string, or the string 'null')
+            if pic_value in [None, '', 'null'] or pic_value is None:
+                user = self.get_object()
+                if user.profile_picture:
+                    user.profile_picture.delete(save=False)
+                user.profile_picture = None
+                user.save()
+                return Response(UserSerializer(user).data)
+        # Otherwise handle normal update (including file upload)
         return super().patch(request, *args, **kwargs)
+
+    def delete(self, request, *args, **kwargs):
+        """Delete user account"""
+        user = self.get_object()
+        user.delete()
+        return Response({'message': 'Account deleted successfully'}, status=status.HTTP_204_NO_CONTENT)

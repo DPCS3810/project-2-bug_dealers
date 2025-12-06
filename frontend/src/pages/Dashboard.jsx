@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
-import { Folder, Trash2, Edit2, Plus, X, Globe, Gift } from 'lucide-react';
+import { Folder, Trash2, Edit2, Plus, X, Globe, Gift, Image as ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
@@ -17,7 +17,11 @@ export default function Dashboard() {
 
     const fetchAlbums = () => {
         client.get('/gallery/albums/')
-            .then(res => setAlbums(res.data))
+            .then(res => {
+                // Filter to show only owned albums (not shared)
+                const ownedAlbums = res.data.filter(album => album.owner === user?.id);
+                setAlbums(ownedAlbums);
+            })
             .catch(err => console.error(err));
     };
 
@@ -202,29 +206,41 @@ export default function Dashboard() {
                 <>
                     <h1 className="text-2xl font-bold mb-6">Shared with Me</h1>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {sharedContent.map(share => (
-                            <Link key={share.token} to={`/share/${share.token}`} className="block">
-                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-lg shadow hover:shadow-lg transition-all hover:scale-[1.02] border border-indigo-100">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="p-3 bg-white rounded-full shadow-sm">
-                                            <Globe className="h-6 w-6 text-purple-600" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-medium text-gray-900">
-                                                {share.album ? 'Shared Album' : 'Shared Photo'}
-                                            </h3>
-                                            <p className="text-sm text-gray-500">
-                                                Received {new Date(share.created_at).toLocaleDateString()}
-                                            </p>
+                        {sharedContent.map(share => {
+                            const isAlbum = share.album !== null;
+                            const title = isAlbum ? share.album_title : share.photo_title;
+                            const owner = isAlbum ? share.album_owner : share.photo_owner;
+                            const linkTo = isAlbum ? `/album/${share.album_id}` : `/editor/${share.photo_id}`;
+
+                            return (
+                                <Link key={share.token} to={linkTo} className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-lg shadow hover:shadow-lg transition-all hover:scale-[1.02] border border-indigo-100">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="p-3 bg-white rounded-full shadow-sm">
+                                                {isAlbum ? (
+                                                    <Folder className="h-6 w-6 text-purple-600" />
+                                                ) : (
+                                                    <ImageIcon className="h-6 w-6 text-purple-600" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-medium text-gray-900">
+                                                    {title || (isAlbum ? 'Untitled Album' : 'Untitled Photo')}
+                                                </h3>
+                                                <p className="text-sm text-gray-500">
+                                                    by {owner}
+                                                </p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-xs px-2 py-1 rounded ${share.can_edit ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {share.can_edit ? 'Can Edit' : 'View Only'}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="mt-4 flex justify-between items-center text-sm text-indigo-600 font-medium">
-                                        <span>View Content</span>
-                                        <span>→</span>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
+                                </Link>
+                            );
+                        })}
                     </div>
                 </>
             )}

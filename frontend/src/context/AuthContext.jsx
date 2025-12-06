@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setToken(null);
+        window.location.href = '/';
     };
 
     return (

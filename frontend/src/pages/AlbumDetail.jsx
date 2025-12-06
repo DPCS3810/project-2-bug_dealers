@@ -1,22 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import client from '../api/client';
-import { Plus, Trash2, CheckCircle, Share2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Share2, Users } from 'lucide-react';
 import ShareModal from '../components/ShareModal';
+import AccessManagement from '../components/AccessManagement';
+import { useAuth } from '../context/AuthContext';
 
 export default function AlbumDetail() {
     const { id } = useParams();
+    const { user } = useAuth();
     const [album, setAlbum] = useState(null);
     const [selectedPhotos, setSelectedPhotos] = useState(new Set());
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
 
     useEffect(() => {
-        const fetchAlbum = () => {
-            client.get(`/gallery/albums/${id}/`)
-                .then(res => setAlbum(res.data))
-                .catch(err => console.error(err));
-        };
         fetchAlbum();
     }, [id]);
 
@@ -48,6 +47,8 @@ export default function AlbumDetail() {
         }
     };
 
+
+
     if (!album) return <div className="text-center mt-10">Loading...</div>;
 
     return (
@@ -58,12 +59,22 @@ export default function AlbumDetail() {
                     <p className="text-gray-600">{album.description}</p>
                 </div>
                 <div className="flex space-x-2">
-                    <button
-                        onClick={() => setIsShareModalOpen(true)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 flex items-center"
-                    >
-                        <Share2 className="h-4 w-4 mr-2" /> Share
-                    </button>
+                    {album.owner === user?.id && (
+                        <>
+                            <button
+                                onClick={() => setIsAccessModalOpen(true)}
+                                className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 flex items-center"
+                            >
+                                <Users className="h-4 w-4 mr-2" /> Manage Access
+                            </button>
+                            <button
+                                onClick={() => setIsShareModalOpen(true)}
+                                className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 flex items-center"
+                            >
+                                <Share2 className="h-4 w-4 mr-2" /> Share
+                            </button>
+                        </>
+                    )}
                     {album.photos && album.photos.length > 0 && (
                         <button
                             onClick={() => { setIsSelectMode(!isSelectMode); setSelectedPhotos(new Set()); }}
@@ -124,6 +135,13 @@ export default function AlbumDetail() {
                 type="album"
                 id={album.id}
                 title={album.title}
+            />
+
+            <AccessManagement
+                isOpen={isAccessModalOpen}
+                onClose={() => setIsAccessModalOpen(false)}
+                resourceType="album"
+                resourceId={album.id}
             />
         </div>
     );
