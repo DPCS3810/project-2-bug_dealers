@@ -1,32 +1,117 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import client from '../api/client';
 
-export default function Share() {
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import client from '../api/client';
+import { Layout } from 'lucide-react';
+
+const Share = () => {
     const { token } = useParams();
-    const [album, setAlbum] = useState(null);
-    const [error, setError] = useState(null);
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
-        client.get(`/gallery/shares/view/${token}/`)
-            .then(res => setAlbum(res.data.album))
-            .catch(err => setError('Invalid link'));
-    }, [token]);
+        const fetchData = async () => {
+            try {
+                const response = await client.get(`/gallery/shares/view/${token}/`);
+                setData(response.data);
+                if (response.data.can_edit) {
+                    localStorage.setItem('shareToken', token);
+                } else {
+                    localStorage.removeItem('shareToken');
+                }
+            } catch (err) {
+                if (err.response && err.response.status === 401) {
+                    // Redirect to login, preserving current location to return after login
+                    navigate('/login', { state: { from: location } });
+                    return;
+                }
+                setError('Invalid or expired link.');
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    if (error) return <div className="text-center mt-10 text-red-500">{error}</div>;
-    if (!album) return <div className="text-center mt-10">Loading...</div>;
+        fetchData();
+    }, [token, navigate, location]);
 
-    return (
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold mb-4">{album.title}</h1>
-            <p className="mb-6 text-gray-600">{album.description}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {album.photos.map(photo => (
-                    <div key={photo.id} className="bg-white p-4 rounded shadow">
-                        <img src={photo.image} alt={photo.title} className="w-full h-48 object-cover rounded" />
-                    </div>
-                ))}
+    if (loading) return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+    );
+
+    if (error) return (
+        <div className="min-h-screen bg-black flex items-center justify-center text-white">
+            <div className="text-center">
+                <h1 className="text-2xl font-bold mb-2">Oops!</h1>
+                <p className="text-white/60">{error}</p>
             </div>
         </div>
     );
-}
+
+    const { type, data: content, can_edit } = data;
+
+    return (
+        <div className="min-h-screen bg-black text-white p-6">
+            <header className="max-w-7xl mx-auto mb-8 flex justify-between items-center border-b border-white/10 pb-4">
+                <div>
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                        Shared {type === 'album' ? 'Album' : 'Photo'}
+                    </h1>
+                    {can_edit && <span className="text-xs font-mono text-green-400 bg-green-400/10 px-2 py-0.5 rounded border border-green-400/20 mt-2 inline-block">EDIT MODE ENABLED</span>}
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto">
+                {type === 'album' ? (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-2xl font-semibold">{content.title}</h2>
+                            <p className="text-white/60">{content.description}</p>
+                        </div>
+
+                        {content.photos && content.photos.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                                {content.photos.map(photo => (
+                                    <div key={photo.id} className="group relative aspect-square bg-[#1e1e1e] rounded-xl overflow-hidden border border-white/10">
+                                        <img
+                                            src={`http://127.0.0.1:8000${photo.image}`}
+                                            alt={photo.title}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
+                                            <p className="font-medium text-white truncate">{photo.title}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-20 bg-[#1e1e1e] rounded-xl border border-dashed border-white/10">
+                                <p className="text-white/40">This album is empty.</p>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="max-w-4xl mx-auto">
+                        <div className="bg-[#1e1e1e] rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                            <img
+                                src={`http://127.0.0.1:8000${content.image}`}
+                                alt={content.title}
+                                className="w-full h-auto max-h-[80vh] object-contain bg-black/50"
+                            />
+                            <div className="p-6">
+                                <h2 className="text-xl font-bold">{content.title || 'Untitled Photo'}</h2>
+                                <p className="text-white/40 text-sm mt-1">Uploaded on {new Date(content.uploaded_at).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
+export default Share;

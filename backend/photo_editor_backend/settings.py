@@ -138,3 +138,8 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # CORS
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Google OAuth
+GOOGLE_OAUTH2_CLIENT_ID = '1028042670362-ttkns9gji669u7jsrdvdd6fe8j951k9s.apps.googleusercontent.com'
+GOOGLE_OAUTH2_CLIENT_SECRET = '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'
+

@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import client from '../api/client';
-import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X } from 'lucide-react';
+import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X, Share2 } from 'lucide-react';
 import { getCroppedImg, applyFilters } from '../utils/canvasUtils';
+import ShareModal from '../components/ShareModal';
 
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
     return centerCrop(
@@ -55,6 +56,7 @@ export default function Editor() {
 
     // UI Message State
     const [notification, setNotification] = useState({ msg: null, isError: false });
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     useEffect(() => {
         client.get(`/gallery/photos/${id}/`)
@@ -252,6 +254,13 @@ export default function Editor() {
                     <button onClick={handleUndo} disabled={history.length <= 1} className="p-2 text-gray-600 disabled:opacity-30 hover:bg-gray-100 rounded">
                         <Undo className="h-5 w-5" />
                     </button>
+                    <button
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        title="Share"
+                    >
+                        <Share2 className="h-5 w-5" />
+                    </button>
                     <button onClick={() => handleSave(true)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Save Copy</button>
                     <button onClick={() => handleSave(false)} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center">
                         <Save className="h-4 w-4 mr-2" /> Save
@@ -396,6 +405,14 @@ export default function Editor() {
                     )}
                 </div>
             </div>
+
+            <ShareModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                type="photo"
+                id={photo.id}
+                title={photo.title}
+            />
         </div>
     );
 }

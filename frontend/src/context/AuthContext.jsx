@@ -12,17 +12,22 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         if (token) {
             client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            try {
-                const decoded = jwtDecode(token);
-                setUser({ username: decoded.username || 'User', id: decoded.user_id });
-            } catch (e) {
-                logout();
-            }
+            client.get('/auth/profile/')
+                .then(res => {
+                    setUser(res.data);
+                })
+                .catch(err => {
+                    console.error("Failed to fetch user profile", err);
+                    logout();
+                })
+                .finally(() => {
+                    setLoading(false);
+                });
         } else {
             delete client.defaults.headers.common['Authorization'];
             setUser(null);
+            setLoading(false);
         }
-        setLoading(false);
     }, [token]);
 
     const login = async (username, password) => {
@@ -44,7 +49,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+        <AuthContext.Provider value={{ user, setUser, token, login, register, logout, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );

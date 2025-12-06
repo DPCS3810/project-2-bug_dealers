@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import client from '../api/client';
-import { Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Share2 } from 'lucide-react';
+import ShareModal from '../components/ShareModal';
 
 export default function AlbumDetail() {
     const { id } = useParams();
     const [album, setAlbum] = useState(null);
     const [selectedPhotos, setSelectedPhotos] = useState(new Set());
     const [isSelectMode, setIsSelectMode] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchAlbum = () => {
@@ -56,6 +58,12 @@ export default function AlbumDetail() {
                     <p className="text-gray-600">{album.description}</p>
                 </div>
                 <div className="flex space-x-2">
+                    <button
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 flex items-center"
+                    >
+                        <Share2 className="h-4 w-4 mr-2" /> Share
+                    </button>
                     {album.photos && album.photos.length > 0 && (
                         <button
                             onClick={() => { setIsSelectMode(!isSelectMode); setSelectedPhotos(new Set()); }}
@@ -109,6 +117,14 @@ export default function AlbumDetail() {
                     <p className="col-span-full text-center text-gray-500 py-10">No photos yet. Click "Add Photo" to upload.</p>
                 )}
             </div>
+
+            <ShareModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                type="album"
+                id={album.id}
+                title={album.title}
+            />
         </div>
     );
 }

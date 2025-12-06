@@ -2,6 +2,7 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Home, ArrowLeft, Search, Image as ImageIcon } from 'lucide-react';
 import { useState } from 'react';
+import ProfileMenu from './ProfileMenu';
 
 export default function Layout() {
     const { user, logout } = useAuth();
@@ -28,9 +29,9 @@ export default function Layout() {
                                     <ArrowLeft className="h-6 w-6" />
                                 </button>
                             )}
-                            <Link to="/" className="flex items-center text-xl font-bold text-indigo-600">
+                            <Link to={user ? "/dashboard" : "/"} className="flex items-center text-xl font-bold" style={{ color: '#399CB8' }}>
                                 <Home className="h-6 w-6 mr-2" />
-                                PhotoService
+                                BugEdits
                             </Link>
                         </div>
 
@@ -53,16 +54,11 @@ export default function Layout() {
 
                         <div className="flex items-center">
                             {user ? (
-                                <>
-                                    <span className="text-gray-700 mr-4">Hello, {user.username}</span>
-                                    <button onClick={logout} className="text-gray-500 hover:text-gray-700">
-                                        <LogOut className="h-5 w-5" />
-                                    </button>
-                                </>
+                                <ProfileMenu />
                             ) : (
                                 <>
-                                    <Link to="/login" className="text-indigo-600 hover:text-indigo-900 px-3 py-2">Login</Link>
-                                    <Link to="/register" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 ml-2">Register</Link>
+                                    <Link to="/login" className="px-3 py-2 hover:opacity-80" style={{ color: '#399CB8' }}>Login</Link>
+                                    <Link to="/register" className="text-white px-4 py-2 rounded-md hover:opacity-90 ml-2" style={{ backgroundColor: '#399CB8' }}>Register</Link>
                                 </>
                             )}
                         </div>

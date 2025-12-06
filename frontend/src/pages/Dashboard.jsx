@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
-import { Folder, Trash2, Edit2, Plus, X } from 'lucide-react';
+import { Folder, Trash2, Edit2, Plus, X, Globe, Gift } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
     const { user } = useAuth();
     const [albums, setAlbums] = useState([]);
+    const [sharedContent, setSharedContent] = useState([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isRedeemOpen, setIsRedeemOpen] = useState(false);
+    const [redeemToken, setRedeemToken] = useState('');
     const [editingAlbum, setEditingAlbum] = useState(null);
     const [newTitle, setNewTitle] = useState('');
     const [newDesc, setNewDesc] = useState('');
@@ -18,8 +21,17 @@ export default function Dashboard() {
             .catch(err => console.error(err));
     };
 
+    const fetchSharedContent = () => {
+        client.get('/gallery/shares/received/')
+            .then(res => setSharedContent(res.data))
+            .catch(err => console.error(err));
+    };
+
     useEffect(() => {
-        if (user) fetchAlbums();
+        if (user) {
+            fetchAlbums();
+            fetchSharedContent();
+        }
     }, [user]);
 
     const handleCreate = async (e) => {
@@ -32,6 +44,27 @@ export default function Dashboard() {
             fetchAlbums();
         } catch (error) {
             alert('Failed to create album');
+        }
+    };
+
+    const handleRedeem = async (e) => {
+        e.preventDefault();
+        try {
+            // Extract token from URL if full URL is pasted
+            let token = redeemToken;
+            if (token.includes('/share/')) {
+                const parts = token.split('/share/');
+                token = parts[parts.length - 1];
+            }
+
+            await client.post('/gallery/shares/redeem/', { token });
+            setIsRedeemOpen(false);
+            setRedeemToken('');
+            fetchSharedContent();
+            alert('Share redeemed successfully!');
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.error || 'Failed to redeem share');
         }
     };
 
@@ -71,6 +104,9 @@ export default function Dashboard() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">My Albums</h1>
                 <div className="space-x-2">
+                    <button onClick={() => setIsRedeemOpen(true)} className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 inline-flex items-center">
+                        <Gift className="h-4 w-4 mr-2" /> Redeem Share
+                    </button>
                     <button onClick={() => setIsCreateOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 flex items-center inline-flex">
                         <Plus className="h-4 w-4 mr-2" /> New Album
                     </button>
@@ -79,6 +115,34 @@ export default function Dashboard() {
                     </Link>
                 </div>
             </div>
+
+            {/* Redeem Modal */}
+            {isRedeemOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Redeem Shared Content</h2>
+                            <button onClick={() => setIsRedeemOpen(false)}><X className="h-6 w-6 text-gray-500" /></button>
+                        </div>
+                        <form onSubmit={handleRedeem} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Share Link or Token</label>
+                                <input
+                                    type="text"
+                                    value={redeemToken}
+                                    onChange={e => setRedeemToken(e.target.value)}
+                                    className="mt-1 block w-full border p-2 rounded"
+                                    placeholder="Paste link here..."
+                                    required
+                                />
+                            </div>
+                            <button type="submit" className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700">
+                                Redeem
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Create/Edit Modal */}
             {(isCreateOpen || editingAlbum) && (
@@ -105,7 +169,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                 {albums.map(album => (
                     <div key={album.id} className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow relative group">
                         <div className="absolute top-2 right-2 flex space-x-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -133,6 +197,37 @@ export default function Dashboard() {
                     </div>
                 ))}
             </div>
+
+            {sharedContent.length > 0 && (
+                <>
+                    <h1 className="text-2xl font-bold mb-6">Shared with Me</h1>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {sharedContent.map(share => (
+                            <Link key={share.token} to={`/share/${share.token}`} className="block">
+                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-lg shadow hover:shadow-lg transition-all hover:scale-[1.02] border border-indigo-100">
+                                    <div className="flex items-center space-x-4">
+                                        <div className="p-3 bg-white rounded-full shadow-sm">
+                                            <Globe className="h-6 w-6 text-purple-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-medium text-gray-900">
+                                                {share.album ? 'Shared Album' : 'Shared Photo'}
+                                            </h3>
+                                            <p className="text-sm text-gray-500">
+                                                Received {new Date(share.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 flex justify-between items-center text-sm text-indigo-600 font-medium">
+                                        <span>View Content</span>
+                                        <span>→</span>
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 }
