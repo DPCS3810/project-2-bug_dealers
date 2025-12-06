@@ -1,0 +1,114 @@
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import client from '../api/client';
+import { Plus, Trash2, CheckCircle } from 'lucide-react';
+
+export default function AlbumDetail() {
+    const { id } = useParams();
+    const [album, setAlbum] = useState(null);
+    const [selectedPhotos, setSelectedPhotos] = useState(new Set());
+    const [isSelectMode, setIsSelectMode] = useState(false);
+
+    useEffect(() => {
+        const fetchAlbum = () => {
+            client.get(`/gallery/albums/${id}/`)
+                .then(res => setAlbum(res.data))
+                .catch(err => console.error(err));
+        };
+        fetchAlbum();
+    }, [id]);
+
+    const fetchAlbum = () => {
+        client.get(`/gallery/albums/${id}/`)
+            .then(res => setAlbum(res.data))
+            .catch(err => console.error(err));
+    };
+
+    const toggleSelect = (photoId) => {
+        const newSelected = new Set(selectedPhotos);
+        if (newSelected.has(photoId)) {
+            newSelected.delete(photoId);
+        } else {
+            newSelected.add(photoId);
+        }
+        setSelectedPhotos(newSelected);
+    };
+
+    const deleteSelected = async () => {
+        if (!window.confirm(`Are you sure you want to delete ${selectedPhotos.size} photos?`)) return;
+        try {
+            await Promise.all(Array.from(selectedPhotos).map(pid => client.delete(`/gallery/photos/${pid}/`)));
+            setSelectedPhotos(new Set());
+            setIsSelectMode(false);
+            fetchAlbum();
+        } catch (error) {
+            alert('Failed to delete photos');
+        }
+    };
+
+    if (!album) return <div className="text-center mt-10">Loading...</div>;
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold">{album.title}</h1>
+                    <p className="text-gray-600">{album.description}</p>
+                </div>
+                <div className="flex space-x-2">
+                    {album.photos && album.photos.length > 0 && (
+                        <button
+                            onClick={() => { setIsSelectMode(!isSelectMode); setSelectedPhotos(new Set()); }}
+                            className={`px-4 py-2 rounded shadow flex items-center ${isSelectMode ? 'bg-gray-200 text-gray-800' : 'bg-white border text-gray-600'}`}
+                        >
+                            {isSelectMode ? 'Cancel Selection' : 'Select Photos'}
+                        </button>
+                    )}
+                    {isSelectMode && selectedPhotos.size > 0 && (
+                        <button onClick={deleteSelected} className="bg-red-600 text-white px-4 py-2 rounded shadow hover:bg-red-700 flex items-center">
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedPhotos.size})
+                        </button>
+                    )}
+                    <Link to={`/upload?albumId=${album.id}`} className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 flex items-center">
+                        <Plus className="h-4 w-4 mr-2" /> Add Photo
+                    </Link>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {album.photos && album.photos.map(photo => (
+                    <div key={photo.id} className="relative group block">
+                        {isSelectMode && (
+                            <div className="absolute inset-0 z-20 cursor-pointer" onClick={() => toggleSelect(photo.id)}></div>
+                        )}
+                        {isSelectMode && (
+                            <div className="absolute top-2 right-2 z-30 p-1 bg-white rounded-full shadow pointer-events-none">
+                                <CheckCircle className={`h-6 w-6 ${selectedPhotos.has(photo.id) ? 'text-indigo-600 fill-indigo-100' : 'text-gray-300'}`} />
+                            </div>
+                        )}
+                        {isSelectMode ? (
+                            <div className={`cursor-pointer ${selectedPhotos.has(photo.id) ? 'ring-4 ring-indigo-500 rounded' : ''}`}>
+                                <img
+                                    src={photo.image}
+                                    alt={photo.title}
+                                    className={`w-full h-48 object-cover rounded shadow transition-opacity ${selectedPhotos.has(photo.id) ? 'opacity-75' : 'group-hover:opacity-75'}`}
+                                />
+                            </div>
+                        ) : (
+                            <Link to={`/editor/${photo.id}`}>
+                                <img
+                                    src={photo.image}
+                                    alt={photo.title}
+                                    className="w-full h-48 object-cover rounded shadow group-hover:opacity-75 transition-opacity"
+                                />
+                            </Link>
+                        )}
+                    </div>
+                ))}
+                {(!album.photos || album.photos.length === 0) && (
+                    <p className="col-span-full text-center text-gray-500 py-10">No photos yet. Click "Add Photo" to upload.</p>
+                )}
+            </div>
+        </div>
+    );
+}
