@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import client from '../api/client';
-import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X, Share2, Download } from 'lucide-react';
+import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X, Share2, Download, Pen, Type } from 'lucide-react';
 import { getCroppedImg, applyFilters } from '../utils/canvasUtils';
 import ShareModal from '../components/ShareModal';
 
@@ -45,9 +45,7 @@ export default function Editor() {
         brightness: 100,
         contrast: 100,
         saturation: 100,
-        sharpness: 0,
         blur: 0,
-        vignette: 0,
     });
 
     // Crop & Rotate
@@ -56,6 +54,19 @@ export default function Editor() {
     const [rotation, setRotation] = useState(0);
     const [aspect, setAspect] = useState(undefined);
     const imgRef = useRef(null);
+
+    // Doodle
+    const [doodleColor, setDoodleColor] = useState('#000000');
+    const [doodleSize, setDoodleSize] = useState(3);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [doodles, setDoodles] = useState([]);
+    const canvasRef = useRef(null);
+
+    // Text
+    const [textBoxes, setTextBoxes] = useState([]);
+    const [selectedTextBox, setSelectedTextBox] = useState(null);
+    const [textColor, setTextColor] = useState('#000000');
+    const [fontSize, setFontSize] = useState(24);
 
     // UI Message State
     const [notification, setNotification] = useState({ msg: null, isError: false });
@@ -93,7 +104,7 @@ export default function Editor() {
             const newHistory = history.slice(0, -1);
             setHistory(newHistory);
             setImageSrc(newHistory[newHistory.length - 1]);
-            setAdjustments({ brightness: 100, contrast: 100, saturation: 100, sharpness: 0, blur: 0, vignette: 0 });
+            setAdjustments({ brightness: 100, contrast: 100, saturation: 100, blur: 0 });
             setCrop(undefined);
             setRotation(0);
         }
@@ -108,7 +119,7 @@ export default function Editor() {
             const blob = await applyFilters(imageSrc, adjustments);
             const newUrl = URL.createObjectURL(blob);
             addToHistory(newUrl);
-            setAdjustments({ brightness: 100, contrast: 100, saturation: 100, sharpness: 0, blur: 0, vignette: 0 });
+            setAdjustments({ brightness: 100, contrast: 100, saturation: 100, blur: 0 });
             setActiveTab('adjust');
         } catch (e) {
             console.error('Filter apply error', e);
@@ -184,6 +195,147 @@ export default function Editor() {
             showNotification("Failed to apply crop: " + e.message, true);
         }
     };
+
+    // Doodle handlers
+    const startDrawing = (e) => {
+        if (activeTab !== 'doodle') return;
+        setIsDrawing(true);
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        setDoodles(prev => [...prev, { points: [{ x, y }], color: doodleColor, size: doodleSize }]);
+    };
+
+    const draw = (e) => {
+        if (!isDrawing || activeTab !== 'doodle') return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        setDoodles(prev => {
+            const newDoodles = [...prev];
+            const lastDoodle = newDoodles[newDoodles.length - 1];
+            lastDoodle.points.push({ x, y });
+            return newDoodles;
+        });
+    };
+
+    const stopDrawing = () => {
+        setIsDrawing(false);
+    };
+
+    const applyDoodle = async () => {
+        if (doodles.length === 0) {
+            showNotification("No doodles to apply", true);
+            return;
+        }
+        try {
+            const img = await createImage(imageSrc);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(img, 0, 0);
+
+            // Get scale factors
+            const scaleX = img.width / imgRef.current.width;
+            const scaleY = img.height / imgRef.current.height;
+
+            // Draw doodles
+            doodles.forEach(doodle => {
+                ctx.strokeStyle = doodle.color;
+                ctx.lineWidth = doodle.size * scaleX;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                doodle.points.forEach((point, i) => {
+                    const scaledX = point.x * scaleX;
+                    const scaledY = point.y * scaleY;
+                    if (i === 0) ctx.moveTo(scaledX, scaledY);
+                    else ctx.lineTo(scaledX, scaledY);
+                });
+                ctx.stroke();
+            });
+
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            const newUrl = URL.createObjectURL(blob);
+            addToHistory(newUrl);
+            setDoodles([]);
+            setActiveTab('adjust');
+        } catch (e) {
+            console.error('Doodle apply error', e);
+            showNotification("Failed to apply doodle", true);
+        }
+    };
+
+    // Text handlers
+    const addTextBox = () => {
+        const newBox = {
+            id: Date.now(),
+            text: 'Double click to edit',
+            x: 100,
+            y: 100,
+            color: textColor,
+            size: fontSize
+        };
+        setTextBoxes(prev => [...prev, newBox]);
+        setSelectedTextBox(newBox.id);
+    };
+
+    const updateTextBox = (id, updates) => {
+        setTextBoxes(prev => prev.map(box => box.id === id ? { ...box, ...updates } : box));
+    };
+
+    const deleteTextBox = (id) => {
+        setTextBoxes(prev => prev.filter(box => box.id !== id));
+        if (selectedTextBox === id) setSelectedTextBox(null);
+    };
+
+    const applyText = async () => {
+        if (textBoxes.length === 0) {
+            showNotification("No text to apply", true);
+            return;
+        }
+        try {
+            const img = await createImage(imageSrc);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(img, 0, 0);
+
+            // Get scale factors
+            const scaleX = img.width / imgRef.current.width;
+            const scaleY = img.height / imgRef.current.height;
+
+            // Draw text
+            textBoxes.forEach(box => {
+                ctx.fillStyle = box.color;
+                ctx.font = `${box.size * scaleX}px Arial`;
+                ctx.fillText(box.text, box.x * scaleX, box.y * scaleY);
+            });
+
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            const newUrl = URL.createObjectURL(blob);
+            addToHistory(newUrl);
+            setTextBoxes([]);
+            setSelectedTextBox(null);
+            setActiveTab('adjust');
+        } catch (e) {
+            console.error('Text apply error', e);
+            showNotification("Failed to apply text", true);
+        }
+    };
+
+    // Helper function
+    const createImage = (url) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.addEventListener('load', () => resolve(img));
+        img.addEventListener('error', reject);
+        img.setAttribute('crossOrigin', 'anonymous');
+        img.src = url;
+    });
 
     const handleSave = async (asCopy = false) => {
         if (!window.confirm(asCopy ? 'Save as a new copy?' : 'Overwrite original?')) return;
@@ -354,6 +506,7 @@ export default function Editor() {
                 ) : (
                     <div className="relative max-w-full max-h-full flex items-center justify-center h-full">
                         <img
+                            ref={imgRef}
                             src={imageSrc}
                             alt="Editing"
                             className="max-w-full max-h-full object-contain shadow-lg"
@@ -361,6 +514,75 @@ export default function Editor() {
                                 filter: `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%) blur(${adjustments.blur}px)`
                             }}
                         />
+
+                        {/* Doodle Canvas Overlay */}
+                        {activeTab === 'doodle' && (
+                            <svg
+                                className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                                style={{ pointerEvents: 'all' }}
+                                onMouseDown={startDrawing}
+                                onMouseMove={draw}
+                                onMouseUp={stopDrawing}
+                                onMouseLeave={stopDrawing}
+                            >
+                                {doodles.map((doodle, i) => (
+                                    <polyline
+                                        key={i}
+                                        points={doodle.points.map(p => `${p.x},${p.y}`).join(' ')}
+                                        stroke={doodle.color}
+                                        strokeWidth={doodle.size}
+                                        fill="none"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                ))}
+                            </svg>
+                        )}
+
+                        {/* Text Boxes */}
+                        {activeTab === 'text' && textBoxes.map(box => (
+                            <div
+                                key={box.id}
+                                className={`absolute cursor-move ${selectedTextBox === box.id ? 'ring-2 ring-indigo-600' : ''}`}
+                                style={{
+                                    left: box.x,
+                                    top: box.y,
+                                    color: box.color,
+                                    fontSize: `${box.size}px`,
+                                    fontFamily: 'Arial',
+                                    whiteSpace: 'nowrap'
+                                }}
+                                draggable
+                                onDragStart={(e) => {
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('text/plain', box.id);
+                                }}
+                                onDragEnd={(e) => {
+                                    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                                    const x = e.clientX - rect.left;
+                                    const y = e.clientY - rect.top;
+                                    updateTextBox(box.id, { x, y });
+                                }}
+                                onClick={() => setSelectedTextBox(box.id)}
+                                onDoubleClick={() => {
+                                    const newText = prompt('Edit text:', box.text);
+                                    if (newText !== null) updateTextBox(box.id, { text: newText });
+                                }}
+                            >
+                                {box.text}
+                                {selectedTextBox === box.id && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteTextBox(box.id);
+                                        }}
+                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
@@ -383,13 +605,27 @@ export default function Editor() {
                         <CropIcon className="h-6 w-6" />
                         <span className="text-xs">Crop & Rotate</span>
                     </button>
+                    <button
+                        onClick={() => setActiveTab('doodle')}
+                        className={`flex flex-col items-center space-y-1 ${activeTab === 'doodle' ? 'text-indigo-600' : 'text-gray-500'}`}
+                    >
+                        <Pen className="h-6 w-6" />
+                        <span className="text-xs">Doodle</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('text')}
+                        className={`flex flex-col items-center space-y-1 ${activeTab === 'text' ? 'text-indigo-600' : 'text-gray-500'}`}
+                    >
+                        <Type className="h-6 w-6" />
+                        <span className="text-xs">Text</span>
+                    </button>
                 </div>
 
                 {/* Contextual Controls */}
                 <div className="h-24">
                     {activeTab === 'adjust' && (
                         <div className="space-y-3 max-w-6xl mx-auto">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-xs text-gray-500 flex justify-between">Brightness <span>{adjustments.brightness}%</span></label>
                                     <input
@@ -418,29 +654,11 @@ export default function Editor() {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs text-gray-500 flex justify-between">Sharpness <span>{adjustments.sharpness}</span></label>
-                                    <input
-                                        type="range" min="0" max="100"
-                                        value={adjustments.sharpness}
-                                        onChange={(e) => handleAdjustmentChange('sharpness', e.target.value)}
-                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                    />
-                                </div>
-                                <div className="space-y-1">
                                     <label className="text-xs text-gray-500 flex justify-between">Blur <span>{adjustments.blur}px</span></label>
                                     <input
                                         type="range" min="0" max="20"
                                         value={adjustments.blur}
                                         onChange={(e) => handleAdjustmentChange('blur', e.target.value)}
-                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs text-gray-500 flex justify-between">Vignette <span>{adjustments.vignette}</span></label>
-                                    <input
-                                        type="range" min="0" max="100"
-                                        value={adjustments.vignette}
-                                        onChange={(e) => handleAdjustmentChange('vignette', e.target.value)}
                                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                                     />
                                 </div>
@@ -482,6 +700,93 @@ export default function Editor() {
                                 <button onClick={applyCrop} className="px-4 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
                                     Done
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'doodle' && (
+                        <div className="flex flex-col items-center space-y-3">
+                            <div className="flex items-center space-x-4">
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">Brush Size: {doodleSize}px</label>
+                                    <input
+                                        type="range" min="1" max="20"
+                                        value={doodleSize}
+                                        onChange={(e) => setDoodleSize(Number(e.target.value))}
+                                        className="w-32 h-2 bg-gray-200 rounded-lg"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">Color</label>
+                                    <div className="flex items-center space-x-2">
+                                        {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'].map(color => (
+                                            <button
+                                                key={color}
+                                                onClick={() => setDoodleColor(color)}
+                                                className={`w-6 h-6 rounded-full border-2 ${doodleColor === color ? 'border-indigo-600' : 'border-gray-300'}`}
+                                                style={{ backgroundColor: color }}
+                                            />
+                                        ))}
+                                        <input
+                                            type="color"
+                                            value={doodleColor}
+                                            onChange={(e) => setDoodleColor(e.target.value)}
+                                            className="w-8 h-8 rounded cursor-pointer"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={doodleColor}
+                                            onChange={(e) => setDoodleColor(e.target.value)}
+                                            placeholder="#000000"
+                                            className="w-24 px-2 py-1 text-xs border rounded"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-xs text-gray-500">Draw on the image above. Click "Apply" when done.</div>
+                            <div className="flex space-x-2">
+                                <button onClick={() => setDoodles([])} className="px-4 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
+                                    Clear
+                                </button>
+                                <button onClick={applyDoodle} className="px-4 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+                                    Apply Doodle
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'text' && (
+                        <div className="flex flex-col items-center space-y-3">
+                            <div className="flex items-center space-x-4">
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">Font Size: {fontSize}px</label>
+                                    <input
+                                        type="range" min="12" max="72"
+                                        value={fontSize}
+                                        onChange={(e) => setFontSize(Number(e.target.value))}
+                                        className="w-32 h-2 bg-gray-200 rounded-lg"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">Color</label>
+                                    <input
+                                        type="color"
+                                        value={textColor}
+                                        onChange={(e) => setTextColor(e.target.value)}
+                                        className="w-8 h-8 rounded cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                            <div className="text-xs text-gray-500">Click "Add Text" to add a text box. Double-click to edit. Drag to move.</div>
+                            <div className="flex space-x-2">
+                                <button onClick={addTextBox} className="px-4 py-1 bg-indigo-100 text-indigo-700 rounded text-sm hover:bg-indigo-200">
+                                    Add Text Box
+                                </button>
+                                {textBoxes.length > 0 && (
+                                    <button onClick={applyText} className="px-4 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+                                        Apply Text
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

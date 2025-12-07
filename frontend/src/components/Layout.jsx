@@ -30,7 +30,7 @@ export default function Layout() {
                                 </button>
                             )}
                             <Link to={user ? "/dashboard" : "/"} className="flex items-center text-xl font-bold" style={{ color: '#399CB8' }}>
-                                <Home className="h-6 w-6 mr-2" />
+                                <img src="/logo.png" alt="BugEdits Logo" className="h-10 w-10 mr-2" />
                                 BugEdits
                             </Link>
                         </div>

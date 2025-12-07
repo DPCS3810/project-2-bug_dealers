@@ -63,13 +63,15 @@ export default function AlbumDetail() {
                         <>
                             <button
                                 onClick={() => setIsAccessModalOpen(true)}
-                                className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 flex items-center"
+                                className="text-white px-4 py-2 rounded shadow hover:opacity-90 flex items-center"
+                                style={{ backgroundColor: '#399CB8' }}
                             >
                                 <Users className="h-4 w-4 mr-2" /> Manage Access
                             </button>
                             <button
                                 onClick={() => setIsShareModalOpen(true)}
-                                className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 flex items-center"
+                                className="text-white px-4 py-2 rounded shadow hover:opacity-90 flex items-center"
+                                style={{ backgroundColor: '#399CB8' }}
                             >
                                 <Share2 className="h-4 w-4 mr-2" /> Share
                             </button>
@@ -78,7 +80,8 @@ export default function AlbumDetail() {
                     {album.photos && album.photos.length > 0 && (
                         <button
                             onClick={() => { setIsSelectMode(!isSelectMode); setSelectedPhotos(new Set()); }}
-                            className={`px-4 py-2 rounded shadow flex items-center ${isSelectMode ? 'bg-gray-200 text-gray-800' : 'bg-white border text-gray-600'}`}
+                            className={`px-4 py-2 rounded shadow flex items-center ${isSelectMode ? 'bg-gray-200 text-gray-800' : 'text-white hover:opacity-90'}`}
+                            style={!isSelectMode ? { backgroundColor: '#399CB8' } : {}}
                         >
                             {isSelectMode ? 'Cancel Selection' : 'Select Photos'}
                         </button>
@@ -88,7 +91,7 @@ export default function AlbumDetail() {
                             <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedPhotos.size})
                         </button>
                     )}
-                    <Link to={`/upload?albumId=${album.id}`} className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 flex items-center">
+                    <Link to={`/upload?albumId=${album.id}`} className="text-white px-4 py-2 rounded shadow hover:opacity-90 flex items-center" style={{ backgroundColor: '#399CB8' }}>
                         <Plus className="h-4 w-4 mr-2" /> Add Photo
                     </Link>
                 </div>

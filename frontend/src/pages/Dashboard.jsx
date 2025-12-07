@@ -108,13 +108,13 @@ export default function Dashboard() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">My Albums</h1>
                 <div className="space-x-2">
-                    <button onClick={() => setIsRedeemOpen(true)} className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 inline-flex items-center">
+                    <button onClick={() => setIsRedeemOpen(true)} className="text-white px-4 py-2 rounded shadow hover:opacity-90 inline-flex items-center" style={{ backgroundColor: '#399CB8' }}>
                         <Gift className="h-4 w-4 mr-2" /> Redeem Share
                     </button>
-                    <button onClick={() => setIsCreateOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 flex items-center inline-flex">
+                    <button onClick={() => setIsCreateOpen(true)} className="text-white px-4 py-2 rounded shadow hover:opacity-90 flex items-center inline-flex" style={{ backgroundColor: '#399CB8' }}>
                         <Plus className="h-4 w-4 mr-2" /> New Album
                     </button>
-                    <Link to="/upload" className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 inline-flex items-center">
+                    <Link to="/upload" className="text-white px-4 py-2 rounded shadow hover:opacity-90 inline-flex items-center" style={{ backgroundColor: '#399CB8' }}>
                         <Plus className="h-4 w-4 mr-2" /> Upload Photo
                     </Link>
                 </div>
