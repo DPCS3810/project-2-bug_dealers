@@ -10,7 +10,7 @@ if len(sys.argv) < 4:
 username = sys.argv[1]
 password = sys.argv[2]
 email = sys.argv[3]
-base_url = 'http://localhost:8000'
+base_url = 'https://bugedits.site'
 
 url = f'{base_url}/api/auth/register/'
 data = {

@@ -9,7 +9,7 @@ if len(sys.argv) < 3:
 
 username = sys.argv[1]
 password = sys.argv[2]
-base_url = 'http://localhost:8000'
+base_url = 'https://bugedits.site/api'
 
 # 1. Login
 resp = requests.post(f'{base_url}/api/auth/login/', data={'username': username, 'password': password})

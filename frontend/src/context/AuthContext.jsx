@@ -49,6 +49,7 @@ export const AuthProvider = ({ children }) => {
         window.location.href = '/';
     };
 
+
     return (
         <AuthContext.Provider value={{ user, setUser, token, login, register, logout, loading }}>
             {!loading && children}

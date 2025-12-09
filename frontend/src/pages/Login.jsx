@@ -24,13 +24,16 @@ export default function Login() {
     };
 
     const handleGoogleLogin = () => {
-        const CLIENT_ID = '1028042670362-ttkns9gji669u7jsrdvdd6fe8j951k9s.apps.googleusercontent.com';
-        const REDIRECT_URI = 'http://localhost:5173/auth/google/callback';
+        const CLIENT_ID = process.env.REACT_APP_OAUTH_CLIENT_ID;
+        const REDIRECT_URI = process.env.REACT_APP_REDIRECT_URI;
         const SCOPE = 'email profile';
-        const GOOGLE_AUTH_URL = `https://accounts.google.com/o/oauth2/auth?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SCOPE}&response_type=code`;
+
+        const GOOGLE_AUTH_URL =
+            `https://accounts.google.com/o/oauth2/auth?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SCOPE}&response_type=code`;
 
         window.location.href = GOOGLE_AUTH_URL;
     };
+
 
     return (
         <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">

@@ -1,5 +1,8 @@
 # BugEdits - Photo Editing & Sharing Platform
 BugEdits is a full-stack web application that allows users to upload, edit, manage, and share photos. It features a robust image editor with filtering, cropping, and doodling capabilities, along with a secure sharing system for collaboration.
+
+Link to access application: bugedits.site
+
 ## Features
 -   **User Authentication**: Secure Login and Registration (JWT-based).
 -   **Photo Management**: Upload, view, and organize photos into Albums.
