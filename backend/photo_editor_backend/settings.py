@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,8 +26,15 @@ SECRET_KEY = 'django-insecure-*fn%i14&-%g*(60^kv5$kdvbcoua^iut+u912n9sbr#h*jg@#7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# In your backend Django settings.py file
 
+ALLOWED_HOSTS = [
+    'ec2-15-207-71-227.ap-south-1.compute.amazonaws.com', # The DNS name
+    '15.207.71.227',                                      # The IP address
+    'localhost',                                          # Local access
+    '127.0.0.1',                                          # Local access
+    'prod-photo-app.chaiwweuigtu.ap-south-1.rds.amazonaws.com', # Optional: RDS endpoint
+]
 
 # Application definition
 
