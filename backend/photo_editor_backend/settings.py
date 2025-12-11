@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-*fn%i14&-%g*(60^kv5$kdvbcoua^iut+u912n9sbr#h*jg@#7'
 
-DEBUG = True   # Change to False for production
+DEBUG = True  # Change to False for production!
 
 ALLOWED_HOSTS = [
     'ec2-13-234-242-97.ap-south-1.compute.amazonaws.com',
@@ -14,6 +14,8 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'bugedits.site',
     'www.bugedits.site',
+    '13.234.242.97',
+    
 ]
 
 INSTALLED_APPS = [
@@ -27,7 +29,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
     'corsheaders',
-    'storages',
+    'storages',   # REQUIRED FOR S3 STORAGE
 
     'whitenoise.runserver_nostatic',
 
@@ -44,7 +46,6 @@ REST_FRAMEWORK = {
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-
     'whitenoise.middleware.WhiteNoiseMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -74,20 +75,27 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'photo_editor_backend.wsgi.application'
 
-# ---- DATABASE ----
+
+# ------------------------------
+# DATABASE
+# ------------------------------
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',  # replace with Postgres later
+        'ENGINE': 'django.db.backends.sqlite3', 
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
-# ---- CORS + CSRF CONFIG ----
+# ------------------------------
+# CORS / CSRF
+# ------------------------------
 CORS_ALLOWED_ORIGINS = [
     "https://bugedits.site",
     "https://www.bugedits.site",
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://bugedits.site",
+    "http://www.bugedits.site",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -97,33 +105,70 @@ CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 CSRF_TRUSTED_ORIGINS = [
     "https://bugedits.site",
     "https://www.bugedits.site",
+    "http://bugedits.site",
+    "http://www.bugedits.site",
 ]
 
-# ---- PASSWORD VALIDATION ----
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# ---- INTERNATIONALIZATION ----
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-# ---- STATIC & MEDIA FILES ----
+# ------------------------------
+# STATIC FILES
+# ------------------------------
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# ------------------------------
+# LOCAL MEDIA — ONLY USED IF S3 IS DISABLED
+# ------------------------------
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# ------------------------------
+# ENABLE S3 STORAGE
+# ------------------------------
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+#AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "ap-south-1")
+
+
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_FILE_OVERWRITE = True
+AWS_DEFAULT_ACL = None          # DO NOT set to "public-read" here
+AWS_QUERYSTRING_AUTH = False    # Pretty public URLs
+
+# CRITICAL: Ensures each uploaded file gets ACL = public-read
+AWS_S3_OBJECT_PARAMETERS = {
+    #"ACL": "public-read", 
+    "CacheControl": "max-age=86400",
+}
+
+#AWS_S3_OBJECT_PARAMETERS = {
+#    'CacheControl': 'no-cache, no-store, must-revalidate',
+#    'Expires': '0',
+#}
+
+
+#AWS_S3_REGION_NAME = "ap-south-1"
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+AWS_S3_ADDRESSING_STYLE = "virtual"
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+
+
+# ------------------------------
+# AUTH
+# ------------------------------
 AUTH_USER_MODEL = 'accounts.User'
 
-# ---- GOOGLE OAUTH ----
+# ------------------------------
+# GOOGLE OAUTH
+# ------------------------------
 GOOGLE_OAUTH2_CLIENT_ID = '1028042670362-ttkns9gji669u7jsrdvdd6fe8j951k9s.apps.googleusercontent.com'
 GOOGLE_OAUTH2_CLIENT_SECRET = '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'
+
+GOOGLE_REDIRECT_URI = "https://bugedits.site/auth/callback"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

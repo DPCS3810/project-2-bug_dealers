@@ -55,12 +55,42 @@ export default function Search() {
                 {photos.length === 0 ? <p className="text-gray-500">No photos found.</p> : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                         {photos.map(photo => (
-                            <Link to={`/editor/${photo.id}`} key={photo.id} className="block group relative">
-                                <img src={photo.image} alt={photo.title} className="w-full h-48 object-cover rounded shadow group-hover:opacity-75 transition-opacity" />
-                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-sm truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {photo.title}
-                                </div>
+                            <Link
+                                to={`/editor/${photo.id}`}
+                                key={photo.id}
+                                className="block group relative bg-white rounded shadow hover:shadow-lg transition-shadow p-2"
+                            >
+                                <img
+                                    src={photo.image}
+                                    alt={photo.title}
+                                    className="w-full h-40 object-cover rounded"
+                                />
+
+                                {/* Title */}
+                                <p className="mt-2 text-sm font-medium text-gray-900 truncate">
+                                    {photo.title || "Untitled"}
+                                </p>
+
+                                {/* Tags */}
+                                {photo.tags && photo.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {photo.tags.map(tag => (
+                                            <span
+                                                key={tag.id}
+                                                className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full"
+                                            >
+                                                #{tag.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Metadata */}
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {new Date(photo.uploaded_at).toLocaleString()}
+                                </p>
                             </Link>
+
                         ))}
                     </div>
                 )}

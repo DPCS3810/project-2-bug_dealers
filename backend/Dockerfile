@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+RUN pip install boto3 django-storages
 
 # Copy project
 COPY . /app/

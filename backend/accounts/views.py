@@ -47,7 +47,7 @@ class GoogleLoginView(APIView):
             'code': code,
             'client_id': settings.GOOGLE_OAUTH2_CLIENT_ID,
             'client_secret': settings.GOOGLE_OAUTH2_CLIENT_SECRET,
-            'redirect_uri': 'http://localhost:5173/auth/google/callback',
+            'redirect_uri': settings.GOOGLE_REDIRECT_URI,
             'grant_type': 'authorization_code'
         }
         

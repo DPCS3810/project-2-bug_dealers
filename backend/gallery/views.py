@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, parsers, status, filters
 from django.db import models
-from .models import Album, Photo, Share
-from .serializers import AlbumSerializer, PhotoSerializer, ShareSerializer, SharedContentSerializer, ShareDetailSerializer
+from .models import Album, Photo, Share, Tag
+from .serializers import AlbumSerializer, PhotoSerializer, TagSerializer, ShareSerializer, SharedContentSerializer, ShareDetailSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from PIL import Image, ImageEnhance
@@ -50,7 +50,8 @@ class PhotoViewSet(viewsets.ModelViewSet):
     serializer_class = PhotoSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [filters.SearchFilter]
-    search_fields = ['title']
+    search_fields = ['title', 'tags__name', 'uploaded_at']
+
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
     def get_queryset(self):
@@ -267,3 +268,10 @@ class ShareViewSet(viewsets.ModelViewSet):
         
         share.delete()
         return Response({'status': 'access revoked'}, status=status.HTTP_204_NO_CONTENT)
+
+class TagViewSet(viewsets.ModelViewSet):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [permissions.IsAuthenticated]  # Only logged-in users can make tags
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name']

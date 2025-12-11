@@ -7,6 +7,12 @@ import { Trash2, Save, RotateCw, Undo, Crop as CropIcon, Sliders, Check, X, Shar
 import { getCroppedImg, applyFilters } from '../utils/canvasUtils';
 import ShareModal from '../components/ShareModal';
 
+const cacheBust = (url) =>
+    url.startsWith("blob:")
+        ? url
+        : `${url}?cb=${Date.now()}`;
+
+
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
     return centerCrop(
         makeAspectCrop(
@@ -30,12 +36,19 @@ export default function Editor() {
     const [title, setTitle] = useState('');
     const [editingTitle, setEditingTitle] = useState(false);
 
+    // Tags
+    const [tags, setTags] = useState([]);
+    const [newTag, setNewTag] = useState('');
+
+
     // Original metadata
     const [photo, setPhoto] = useState(null);
 
     // Image State
     const [imageSrc, setImageSrc] = useState(null);
     const [history, setHistory] = useState([]);
+    const [imageBlob, setImageBlob] = useState(null); // added new
+
 
     // Tools
     const [activeTab, setActiveTab] = useState('adjust');
@@ -77,8 +90,10 @@ export default function Editor() {
             .then(res => {
                 setPhoto(res.data);
                 setTitle(res.data.title);
-                setImageSrc(res.data.image);
-                setHistory([res.data.image]);
+                setTags(res.data.tags || []);
+                const freshUrl = res.data.image + "?cb=" + Date.now();
+                setImageSrc(freshUrl);
+                setHistory([freshUrl]);
             })
             .catch(err => {
                 console.error(err);
@@ -103,7 +118,7 @@ export default function Editor() {
         if (history.length > 1) {
             const newHistory = history.slice(0, -1);
             setHistory(newHistory);
-            setImageSrc(newHistory[newHistory.length - 1]);
+            setImageSrc(cacheBust(newHistory[newHistory.length - 1]));
             setAdjustments({ brightness: 100, contrast: 100, saturation: 100, blur: 0 });
             setCrop(undefined);
             setRotation(0);
@@ -118,6 +133,7 @@ export default function Editor() {
         try {
             const blob = await applyFilters(imageSrc, adjustments);
             const newUrl = URL.createObjectURL(blob);
+            setImageBlob(blob);
             addToHistory(newUrl);
             setAdjustments({ brightness: 100, contrast: 100, saturation: 100, blur: 0 });
             setActiveTab('adjust');
@@ -257,8 +273,9 @@ export default function Editor() {
                 ctx.stroke();
             });
 
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            const blob = await new Promise(resolve => canvas.toBlob(resolve));
             const newUrl = URL.createObjectURL(blob);
+            setImageBlob(blob); //added new
             addToHistory(newUrl);
             setDoodles([]);
             setActiveTab('adjust');
@@ -316,7 +333,7 @@ export default function Editor() {
                 ctx.fillText(box.text, box.x * scaleX, box.y * scaleY);
             });
 
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            const blob = await new Promise(resolve => canvas.toBlob(resolve));
             const newUrl = URL.createObjectURL(blob);
             addToHistory(newUrl);
             setTextBoxes([]);
@@ -331,23 +348,74 @@ export default function Editor() {
     // Helper function
     const createImage = (url) => new Promise((resolve, reject) => {
         const img = new Image();
-        img.addEventListener('load', () => resolve(img));
-        img.addEventListener('error', reject);
-        img.setAttribute('crossOrigin', 'anonymous');
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+
+        // Only set CORS for external URLs, NEVER for blob: URLs
+        if (!url.startsWith("blob:")) {
+            img.crossOrigin = "anonymous";
+        }
+
         img.src = url;
     });
+
+    const createTag = async (tagName) => {
+        try {
+            const res = await client.post('/gallery/tags/', { name: tagName });
+            return res.data; // {id, name}
+        } catch (err) {
+            if (err.response?.status === 400) {
+                // Tag already exists → fetch it
+                const r = await client.get(`/gallery/tags/?search=${tagName}`);
+                return r.data[0];
+            }
+            throw err;
+        }
+    };
+
 
     const handleSave = async (asCopy = false) => {
         if (!window.confirm(asCopy ? 'Save as a new copy?' : 'Overwrite original?')) return;
         setNotification({ msg: null, isError: false });
 
         try {
-            const response = await fetch(imageSrc);
-            const blob = await response.blob();
-            const file = new File([blob], "edited_image.jpg", { type: "image/jpeg" });
+            //const response = await fetch(imageSrc);
+            //const blob = await response.blob();
+            //const file = new File([blob], "edited_image.jpg", { type: "image/jpeg" });
+
+            if (!imageBlob) {
+                showNotification("No edited image to save", true);
+                return;
+            }
+
+            // Real MIME type from the generated blob
+            let mimeType = imageBlob.type;
+
+            // Extract correct extension
+            let ext = 'jpg'; // fallback
+
+            if (mimeType === 'image/png') ext = 'png';
+            if (mimeType === 'image/webp') ext = 'webp';
+            if (mimeType === 'image/jpeg') ext = 'jpg';
+
+            // Build filename
+            const filename = `edited_image.${ext}`;
+
+            // Create File with correct type
+            const file = new File([imageBlob], filename, { type: mimeType });
+
+
 
             const formData = new FormData();
+
+            // Always attach image
             formData.append('image', file);
+
+            // Always attach title
+            formData.append('title', asCopy ? `${title} (Copy)` : title);
+
+            // Always attach tags
+            tags.forEach(t => formData.append('tag_ids', t.id));
 
             let targetUrl = `/gallery/photos/${id}/`;
             let method = 'patch';
@@ -355,32 +423,38 @@ export default function Editor() {
             if (asCopy) {
                 targetUrl = '/gallery/photos/';
                 method = 'post';
-                formData.append('title', `${title} (Copy)`);
+
+                // Include optional fields only for new copies
                 if (photo.album) {
                     formData.append('album', photo.album);
                 }
                 formData.append('description', photo.description || '');
-            } else {
-                formData.append('title', title);
             }
+
 
             // Explicitly set Content-Type to multipart/form-data to override client default
             // Axios will set the boundary automatically when it detects FormData, 
             // but we need to ensure the client default 'application/json' doesn't override it incorrectly.
             // Passing 'multipart/form-data' explicitly is the safest bet here given the user's previous error.
-            await client[method](targetUrl, formData, {
+            const response = await client[method](targetUrl, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 }
             });
 
+            // backend sends updated photo record
+            setPhoto(response.data);
+
+            const freshUrl = cacheBust(response.data.image);
+            setHistory([freshUrl]);
+            setImageSrc(freshUrl);
+
             if (asCopy) {
-                // Navigate immediately
                 navigate(-1);
             } else {
-                setHistory([imageSrc]);
                 showNotification('Saved successfully!');
             }
+
 
         } catch (error) {
             console.error('Save failed', error);
@@ -390,7 +464,11 @@ export default function Editor() {
     };
 
     const handleSaveTitle = () => {
-        client.patch(`/gallery/photos/${id}/`, { title })
+        client.patch(`/gallery/photos/${id}/`, {
+            title,
+            tag_ids: tags.map(t => t.id)
+        })
+
             .then(res => {
                 setPhoto(res.data);
                 setEditingTitle(false);
@@ -497,6 +575,7 @@ export default function Editor() {
                             <img
                                 ref={imgRef}
                                 src={imageSrc}
+                                /*crossOrigin="anonymous"*/
                                 alt="Crop Me"
                                 onLoad={onImageLoad}
                                 style={{ transform: `rotate(${rotation}deg)`, maxHeight: '70vh', maxWidth: '100%' }}
@@ -508,6 +587,7 @@ export default function Editor() {
                         <img
                             ref={imgRef}
                             src={imageSrc}
+                            /*crossOrigin="anonymous"*/
                             alt="Editing"
                             className="max-w-full max-h-full object-contain shadow-lg"
                             style={{
@@ -589,6 +669,51 @@ export default function Editor() {
 
             {/* Controls Toolbar */}
             <div className="bg-white border-t p-4 z-20">
+                {/* Tag Editor */}
+                <div className="mb-4">
+                    <label className="text-xs text-gray-500 mb-1 block">Tags</label>
+
+                    {/* Existing tags */}
+                    <div className="flex flex-wrap gap-2 mb-2">
+                        {tags.map(tag => (
+                            <span
+                                key={tag.id}
+                                className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs flex items-center"
+                            >
+                                #{tag.name}
+                                <button
+                                    className="ml-1 text-red-600 text-xs"
+                                    onClick={() => setTags(tags.filter(t => t.id !== tag.id))}
+                                >
+                                    ✕
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+
+                    {/* Add tag input */}
+                    <div className="flex space-x-2">
+                        <input
+                            type="text"
+                            value={newTag}
+                            onChange={e => setNewTag(e.target.value)}
+                            placeholder="Add tag (e.g., beach)"
+                            className="border p-2 rounded w-full text-sm"
+                        />
+                        <button
+                            className="px-3 py-1 bg-indigo-600 text-white rounded text-sm"
+                            onClick={async () => {
+                                if (!newTag.trim()) return;
+                                const created = await createTag(newTag.trim().replace('#', ''));
+                                setTags([...tags, created]);
+                                setNewTag('');
+                            }}
+                        >
+                            Add
+                        </button>
+                    </div>
+                </div>
+
                 {/* Mode Selector */}
                 <div className="flex justify-center space-x-6 mb-4">
                     <button
@@ -803,3 +928,5 @@ export default function Editor() {
         </div>
     );
 }
+
+

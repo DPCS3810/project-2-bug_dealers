@@ -26,7 +26,7 @@ function App() {
           <Route path="album/:id" element={<AlbumDetail />} />
           <Route path="search" element={<Search />} />
           <Route path="share/:token" element={<Share />} />
-          <Route path="auth/google/callback" element={<GoogleCallback />} />
+          <Route path="auth/callback" element={<GoogleCallback />} />
         </Route>
       </Routes>
     </AuthProvider>

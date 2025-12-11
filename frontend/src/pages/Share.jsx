@@ -78,7 +78,7 @@ const Share = () => {
                                 {content.photos.map(photo => (
                                     <div key={photo.id} className="group relative aspect-square bg-[#1e1e1e] rounded-xl overflow-hidden border border-white/10">
                                         <img
-                                            src={`http://127.0.0.1:8000${photo.image}`}
+                                            src={`${import.meta.env.VITE_MEDIA_URL}${photo.image}`}
                                             alt={photo.title}
                                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                         />
@@ -98,7 +98,7 @@ const Share = () => {
                     <div className="max-w-4xl mx-auto">
                         <div className="bg-[#1e1e1e] rounded-xl overflow-hidden border border-white/10 shadow-2xl">
                             <img
-                                src={`http://127.0.0.1:8000${content.image}`}
+                                src={`${import.meta.env.VITE_MEDIA_URL}${content.image}`}
                                 alt={content.title}
                                 className="w-full h-auto max-h-[80vh] object-contain bg-black/50"
                             />

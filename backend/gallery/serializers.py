@@ -1,8 +1,20 @@
 from rest_framework import serializers
-from .models import Album, Photo, Share, PhotoEditLog
+from .models import Album, Photo, Share, PhotoEditLog, Tag
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name']
 
 class PhotoSerializer(serializers.ModelSerializer):
     has_unseen_edits = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        write_only=True,
+        queryset=Tag.objects.all(),
+        required=False
+    )
 
     class Meta:
         model = Photo
@@ -14,6 +26,19 @@ class PhotoSerializer(serializers.ModelSerializer):
         if request and request.user == obj.owner:
             return obj.edit_logs.filter(is_seen=False).exists()
         return False
+
+    def create(self, validated_data):
+        tag_ids = validated_data.pop('tag_ids', [])
+        photo = super().create(validated_data)
+        photo.tags.set(tag_ids)
+        return photo
+
+    def update(self, instance, validated_data):
+        tag_ids = validated_data.pop('tag_ids', None)
+        photo = super().update(instance, validated_data)
+        if tag_ids is not None:
+            photo.tags.set(tag_ids)
+        return photo
 
 class AlbumSerializer(serializers.ModelSerializer):
     photos = PhotoSerializer(many=True, read_only=True)

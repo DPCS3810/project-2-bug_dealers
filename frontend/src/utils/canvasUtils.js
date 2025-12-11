@@ -68,7 +68,7 @@ export async function getCroppedImg(
         return new Promise((resolve) => {
             canvas.toBlob((file) => {
                 resolve(file)
-            }, 'image/jpeg')
+            });
         })
     }
 
@@ -91,7 +91,7 @@ export async function getCroppedImg(
     return new Promise((resolve, reject) => {
         canvas.toBlob((file) => {
             resolve(file)
-        }, 'image/jpeg')
+        });
     })
 }
 
@@ -121,7 +121,7 @@ export async function applyFilters(imageSrc, adjustments) {
     }
 
     return new Promise((resolve) => {
-        canvas.toBlob(resolve, 'image/jpeg');
+        canvas.toBlob(resolve);
     });
 }
 

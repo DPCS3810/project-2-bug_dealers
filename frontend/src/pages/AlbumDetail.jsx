@@ -125,6 +125,29 @@ export default function AlbumDetail() {
                                 />
                             </Link>
                         )}
+                        <div className="mt-2 px-1">
+                            {/* Tags */}
+                            {photo.tags && photo.tags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                    {photo.tags.map(tag => (
+                                        <span
+                                            key={tag.id}
+                                            className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full"
+                                        >
+                                            #{tag.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-400 italic">No tags</p>
+                            )}
+
+                            {/* Metadata */}
+                            <p className="text-xs text-gray-500">
+                                {new Date(photo.uploaded_at).toLocaleString()}
+                            </p>
+                        </div>
+
                     </div>
                 ))}
                 {(!album.photos || album.photos.length === 0) && (

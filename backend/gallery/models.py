@@ -12,6 +12,13 @@ class Album(models.Model):
 
     def __str__(self):
         return self.title
+    
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
 
 class Photo(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -20,6 +27,8 @@ class Photo(models.Model):
     image = models.ImageField(upload_to='photos/%Y/%m/%d/')
     title = models.CharField(max_length=255, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    tags = models.ManyToManyField('Tag', related_name='photos', blank=True)
+
 
     def __str__(self):
         return self.title or str(self.id)

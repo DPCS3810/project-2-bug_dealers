@@ -24,8 +24,8 @@ export default function Login() {
     };
 
     const handleGoogleLogin = () => {
-        const CLIENT_ID = process.env.REACT_APP_OAUTH_CLIENT_ID;
-        const REDIRECT_URI = process.env.REACT_APP_REDIRECT_URI;
+        const CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID;
+        const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI;
         const SCOPE = 'email profile';
 
         const GOOGLE_AUTH_URL =
