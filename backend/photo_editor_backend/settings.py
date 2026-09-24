@@ -166,8 +166,8 @@ AUTH_USER_MODEL = 'accounts.User'
 # ------------------------------
 # GOOGLE OAUTH
 # ------------------------------
-GOOGLE_OAUTH2_CLIENT_ID = '1028042670362-ttkns9gji669u7jsrdvdd6fe8j951k9s.apps.googleusercontent.com'
-GOOGLE_OAUTH2_CLIENT_SECRET = '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'
+GOOGLE_OAUTH2_CLIENT_ID = ''
+GOOGLE_OAUTH2_CLIENT_SECRET = ''
 
 GOOGLE_REDIRECT_URI = "https://bugedits.site/auth/callback"
 
